@@ -1,0 +1,38 @@
+# Зависимости бэкенда. Меняются только командой uv add / uv remove —
+# она же обновляет uv.lock, по которому собирается одинаковое окружение у всей команды.
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Бэкенд приложения: FastAPI + PostgreSQL"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.13",
+    "pydantic-settings>=2.4",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+# Бэкенд — приложение, а не библиотека: ставить его самого как пакет не нужно.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# E/F — ошибки и неиспользуемое, I — порядок импортов, B — типовые баги, UP — устаревший синтаксис.
+select = ["E", "F", "I", "B", "UP"]

@@ -1,0 +1,63 @@
+# Рабочий стек для разработки: база, бэкенд, фронт.
+# Запуск: docker compose up --build → фронт http://127.0.0.1:5173, API http://127.0.0.1:8000/api/docs
+#
+# AI: ⛔ порты публикуются ТОЛЬКО на 127.0.0.1. Запись «5432:5432» без адреса открывает
+# базу всей сети: в общем Wi-Fi к ней подключится любой сосед с паролем по умолчанию.
+# Если порт на компьютере занят — задайте другой переменной: DB_PORT=5442 docker compose up
+#
+# Пароль базы по умолчанию годится только для своего компьютера. Свой задаётся
+# переменными POSTGRES_* в файле .env рядом с этим файлом.
+
+# AI: имя проекта задаёт префикс контейнеров и томов. Замените на короткое латинское
+# имя продукта, иначе тома двух проектов с одинаковым именем на одном компьютере смешаются.
+name: app
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
+    # Миграции накатываются при каждом старте, --reload перезапускает сервер при правке кода.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      # AI: отдельный том под node_modules — иначе папка проекта, смонтированная в /app,
+      # перекрывает зависимости, собранные в образе, и Vite не стартует.
+      # Грабли: том переживает пересборку. Сменили зависимости — `docker compose up --build -V`,
+      # иначе фронт стартует со старыми библиотеками.
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

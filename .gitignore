@@ -1,0 +1,33 @@
+# Что не попадает в git. Новое служебное — дописывать сюда.
+
+# Личные файлы ИИ-агента: у каждого свои, собираются из RULES.md
+CLAUDE.md
+AGENTS.md
+
+# Секреты
+.env
+.env.*
+!.env.example
+
+# Зависимости и сборки — восстанавливаются из lock-файлов
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+coverage/
+
+# Отчёты e2e
+test-results/
+playwright-report/
+
+# Временное
+tmp/
+*.log
+
+# Мусор macOS и Windows
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,83 @@
+# Тестовый стек: полностью отдельный от рабочего, наружу не публикует ни одного порта.
+# Базы живут в памяти и пропадают после прогона — рабочие данные тесты не видят никогда.
+#
+# Полный прогон — три команды подряд, все должны быть зелёными:
+#   docker compose -f docker-compose.test.yml run --rm --build backend-tests
+#   docker compose -f docker-compose.test.yml run --rm --build frontend-tests
+#   docker compose -f docker-compose.test.yml run --rm --build e2e
+# После прогона: docker compose -f docker-compose.test.yml down -v
+
+# AI: своё имя проекта — контейнеры и тома не пересекаются с рабочим стеком,
+# поэтому тесты можно гонять, пока приложение запущено.
+name: app-test
+
+x-test-db: &test-db
+  image: postgres:16-alpine
+  environment:
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    POSTGRES_DB: test
+  tmpfs:
+    - /var/lib/postgresql/data
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U test -d test"]
+    interval: 2s
+    timeout: 5s
+    retries: 30
+
+services:
+  # AI: у юнит-тестов и у e2e разные базы. Тесты бэкенда в конце откатывают все
+  # миграции — на общей базе это ломало бы e2e, если прогоны идут одновременно.
+  db-tests:
+    <<: *test-db
+
+  db-e2e:
+    <<: *test-db
+
+  backend-tests:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://test:test@db-tests:5432/test
+      TESTING: "1"
+    command: sh -c "ruff check . && ruff format --check . && pytest -q"
+    depends_on:
+      db-tests:
+        condition: service_healthy
+
+  frontend-tests:
+    build: ./frontend
+    command: sh -c "npm run lint && npm run build && npm test"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://test:test@db-e2e:5432/test
+    depends_on:
+      db-e2e:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_PROXY_TARGET: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173 >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  e2e:
+    build: ./e2e
+    environment:
+      E2E_BASE_URL: http://frontend:5173
+    depends_on:
+      frontend:
+        condition: service_healthy
