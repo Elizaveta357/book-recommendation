@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
@@ -56,6 +56,17 @@ def find_current_user(token: str | None, db: DbSession) -> User | None:
     return db.get(User, session.user_id)
 
 
+def require_current_user(db: DbSession, token: SessionCookie = None) -> User:
+    """Отклоняет запрос, если в нём нет действующей пользовательской сессии."""
+    user = find_current_user(token, db)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Требуется вход")
+    return user
+
+
+CurrentUser = Annotated[User, Depends(require_current_user)]
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterCredentials, response: Response, db: DbSession) -> User:
     """Создаёт уникального пользователя и сразу выполняет вход."""
@@ -93,9 +104,6 @@ def logout(response: Response, db: DbSession, token: SessionCookie = None) -> No
 
 
 @router.get("/me", response_model=UserRead)
-def current_user(db: DbSession, token: SessionCookie = None) -> User:
+def current_user(user: CurrentUser) -> User:
     """Возвращает владельца действующей cookie или ответ 401."""
-    user = find_current_user(token, db)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Требуется вход")
     return user

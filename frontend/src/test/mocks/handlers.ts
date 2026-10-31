@@ -26,6 +26,7 @@ const books: Book[] = [
 
 export const handlers = [
   http.get('/api/auth/me', () => new HttpResponse(null, { status: 401 })),
+  http.get('/api/favorites', () => HttpResponse.json([])),
   http.get('/api/books', () => HttpResponse.json(books)),
   http.get('/api/recommendations', ({ request }) => {
     const genre = new URL(request.url).searchParams.get('genre')

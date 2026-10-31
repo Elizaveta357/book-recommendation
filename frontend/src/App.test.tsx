@@ -1,7 +1,7 @@
 /**
  * Главный экран: каталог, подбор по жанру и понятная ошибка загрузки.
  */
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import App from './App.tsx'
@@ -54,5 +54,69 @@ describe('App', () => {
 
     expect(await screen.findByText('reader@example.com')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument()
+  })
+
+  it('добавляет книгу в избранное и удаляет её из личного раздела', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({
+        id: 7,
+        email: 'reader@example.com',
+      })),
+      http.post('/api/favorites/1', () => HttpResponse.json({
+        id: 1,
+        title: 'Дюна',
+        author: 'Фрэнк Герберт',
+        genre: 'Фантастика',
+        description: 'История пустынной планеты Арракис.',
+      }, { status: 201 })),
+      http.delete('/api/favorites/1', () => new HttpResponse(null, { status: 204 })),
+    )
+    render(<App />)
+
+    await screen.findByText('reader@example.com')
+    await user.click(screen.getByRole('button', { name: 'В избранное: Дюна' }))
+
+    const favorites = screen.getByRole('region', { name: 'Моё избранное' })
+    expect(await within(favorites).findByRole('heading', { name: 'Дюна' })).toBeInTheDocument()
+    await user.click(within(favorites).getByRole('button', {
+      name: 'Убрать из избранного: Дюна',
+    }))
+    await waitFor(() => {
+      expect(within(favorites).queryByRole('heading', { name: 'Дюна' })).not.toBeInTheDocument()
+    })
+    expect(within(favorites).getByText('В избранном пока нет книг.')).toBeInTheDocument()
+  })
+
+  it('показывает ошибку добавления в избранное', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({
+        id: 7,
+        email: 'reader@example.com',
+      })),
+      http.post('/api/favorites/1', () => HttpResponse.json(
+        { detail: 'Не удалось сохранить книгу' }, { status: 500 },
+      )),
+    )
+    render(<App />)
+
+    await screen.findByText('reader@example.com')
+    await user.click(screen.getByRole('button', { name: 'В избранное: Дюна' }))
+
+    const favorites = screen.getByRole('region', { name: 'Моё избранное' })
+    expect(await within(favorites).findByRole('alert')).toHaveTextContent(
+      'Не удалось сохранить книгу',
+    )
+  })
+
+  it('предлагает гостю войти для использования избранного', async () => {
+    render(<App />)
+
+    const favorites = screen.getByRole('region', { name: 'Моё избранное' })
+    expect(await within(favorites).findByText(
+      'Войдите или зарегистрируйтесь, чтобы сохранять книги.',
+    )).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'В избранное: Дюна' })).toBeDisabled()
   })
 })
