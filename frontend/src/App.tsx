@@ -2,6 +2,8 @@
  * Главный экран: показывает каталог и подбирает книги по выбранному жанру.
  */
 import { useEffect, useMemo, useState } from 'react'
+import AuthPanel from './AuthPanel.tsx'
+import { getCurrentUser, type User } from './api/auth.ts'
 import { fetchBooks, fetchRecommendations, type Book } from './api/books.ts'
 import './index.css'
 
@@ -28,6 +30,7 @@ export default function App() {
   const [genre, setGenre] = useState('')
   const [recommendations, setRecommendations] = useState<Book[] | null>(null)
   const [recommendationState, setRecommendationState] = useState<LoadingState>('ready')
+  const [user, setUser] = useState<User | null | undefined>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -40,6 +43,19 @@ export default function App() {
         if (!controller.signal.aborted) {
           console.error(error)
           setCatalogState('error')
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getCurrentUser(controller.signal)
+      .then(setUser)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error(error)
+          setUser(null)
         }
       })
     return () => controller.abort()
@@ -69,6 +85,8 @@ export default function App() {
         <h1>Найдите следующую книгу</h1>
         <p>Выберите жанр, а сервис соберёт подходящие книги из каталога.</p>
       </header>
+
+      <AuthPanel user={user} onUserChange={setUser} />
 
       <section className="recommendation-panel" aria-labelledby="recommendation-title">
         <div>

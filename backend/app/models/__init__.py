@@ -6,5 +6,6 @@
 
 from app.db import Base
 from app.models.book import Book
+from app.models.user import User, UserSession
 
-__all__ = ["Base", "Book"]
+__all__ = ["Base", "Book", "User", "UserSession"]

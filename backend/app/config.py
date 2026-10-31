@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # AI: значения по умолчанию нет намеренно. Забыли задать DATABASE_URL —
     # приложение падает при старте с понятной ошибкой, а не подключается к чужой базе.
     database_url: str
+    session_cookie_secure: bool = False
+    session_lifetime_days: int = 7
 
 
 settings = Settings()

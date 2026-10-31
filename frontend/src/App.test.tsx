@@ -43,4 +43,16 @@ describe('App', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Каталог временно недоступен.')
     consoleError.mockRestore()
   })
+
+  it('восстанавливает пользователя из серверной сессии после загрузки', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({
+      id: 7,
+      email: 'reader@example.com',
+    })))
+
+    render(<App />)
+
+    expect(await screen.findByText('reader@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument()
+  })
 })
