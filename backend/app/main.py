@@ -15,10 +15,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db import DbSession
 from app.routers.auth import router as auth_router
 from app.routers.books import router as books_router
+from app.routers.favorites import router as favorites_router
 
 app = FastAPI(title="API приложения", docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.include_router(auth_router)
 app.include_router(books_router)
+app.include_router(favorites_router)
 
 
 class Health(BaseModel):
